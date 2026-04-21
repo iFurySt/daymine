@@ -10,9 +10,9 @@
 
 ## 设计原则
 
-这套默认流水线的目标，是在项目真正成形前先把交付链路搭起来，而不是假装已经知道未来项目该怎么 build 和 deploy。
+这套流水线的目标，是持续产出可追溯的本地 self-hosted 制品。
 
-当新项目的技术栈确定后，你应该把 `scripts/release-package.sh` 里的占位打包逻辑替换成真实构建产物，而不是另起一套平行流程。
+`scripts/release-package.sh` 当前会安装前端依赖、构建 React 静态资源、构建 Go 二进制，并打包成本机平台的 `daymine-${GOOS}-${GOARCH}.tgz`。
 
 所有 GitHub Actions 都已经 pin 到 commit SHA。后续升级 action 时，也要继续保持这个约束。
 
@@ -29,8 +29,8 @@
 当前 release 流水线会产出：
 
 - `release-manifest.json`
-- `repo-metadata.tgz`
+- `daymine-${GOOS}-${GOARCH}.tgz`
 - `sbom.spdx.json`
 - 对 release artifact 生成的 GitHub artifact attestation
 
-也就是说，即使项目还没进入真实部署阶段，这个模板也已经把“可追溯的制品封装”这一步准备好了。
+当前脚本先构建当前 runner 平台的二进制。后续如果要发布多平台制品，应在 release workflow 中矩阵化 `GOOS/GOARCH`，并为每个平台分别生成 artifact。

@@ -1,0 +1,295 @@
+:root {
+  --background: hsl(240 8% 9%);
+  --foreground: hsl(0 0% 85%);
+  --card: hsl(240 8% 10%);
+  --muted: hsl(240 4% 16%);
+  --muted-foreground: hsl(0 0% 58%);
+  --border: hsl(240 4% 16%);
+  --primary: hsl(43 50% 70%);
+  --danger: hsl(0 70% 70%);
+  --ok: hsl(150 42% 56%);
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  color: var(--foreground);
+  background: var(--background);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background: var(--background);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+.shell {
+  min-height: 100vh;
+}
+
+.header {
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: 28px 24px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.brand {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.subtle,
+.muted {
+  color: var(--muted-foreground);
+}
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ok);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 10px;
+}
+
+.layout {
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: 0 24px 32px;
+}
+
+.agent-bar {
+  border: 1px solid var(--border);
+  background: var(--card);
+  border-radius: 6px;
+  padding: 14px;
+  margin-bottom: 18px;
+  display: grid;
+  grid-template-columns: minmax(180px, 280px) 1fr;
+  gap: 14px;
+  align-items: center;
+}
+
+.eyebrow,
+.panel-title {
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.agent-bar h2 {
+  margin: 2px 0 0;
+  font-size: 14px;
+  letter-spacing: 0;
+}
+
+.agent-form {
+  display: grid;
+  grid-template-columns: 160px 1fr auto;
+  gap: 10px;
+}
+
+.agent-form input,
+.agent-form select {
+  min-width: 0;
+  color: var(--foreground);
+  background: hsl(240 7% 8%);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 9px 10px;
+}
+
+.agent-form button,
+.icon-button {
+  color: var(--foreground);
+  background: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+}
+
+.agent-form button {
+  min-width: 82px;
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+}
+
+.grid {
+  display: grid;
+  gap: 18px;
+}
+
+.column {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.panel {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  min-width: 0;
+}
+
+.panel-header {
+  padding: 12px 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+}
+
+.panel-title {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.icon-button {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.panel-body {
+  padding: 14px;
+}
+
+.date-number {
+  font-size: 24px;
+  font-weight: 700;
+  margin-bottom: 12px;
+}
+
+.row,
+.run-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.item,
+.run {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 10px;
+}
+
+.item:last-child,
+.run:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.item-title {
+  font-weight: 650;
+}
+
+.item-detail,
+.mono {
+  color: hsl(0 0% 75%);
+  overflow-wrap: anywhere;
+}
+
+.mono,
+.markdown {
+  font-family: inherit;
+}
+
+.markdown {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: hsl(0 0% 78%);
+}
+
+.pill {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 1px 8px;
+  font-size: 11px;
+}
+
+.pill.completed {
+  color: var(--ok);
+}
+
+.pill.failed {
+  color: var(--danger);
+}
+
+.empty,
+.full-state {
+  color: var(--muted-foreground);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 92px;
+  text-align: center;
+}
+
+.full-state {
+  min-height: 100vh;
+  flex-direction: column;
+}
+
+.full-state h1 {
+  color: var(--foreground);
+  margin: 14px 0 4px;
+}
+
+.spin {
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 920px) {
+  .header,
+  .layout {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+
+  .agent-bar,
+  .agent-form,
+  .grid {
+    grid-template-columns: 1fr !important;
+  }
+}

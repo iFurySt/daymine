@@ -19,6 +19,7 @@ temp/
 
 # Dependency caches and common build output
 node_modules/
+*.tsbuildinfo
 .pnpm-store/
 .npm/
 .yarn/
@@ -31,6 +32,13 @@ target/
 bin/
 obj/
 .cache/
+
+# Daymine embeds the production web bundle in the Go binary.
+!apps/daymine/internal/webassets/dist/
+!apps/daymine/internal/webassets/dist/**
+
+# Local Daymine workspace
+.daymine/
 
 # Python
 __pycache__/

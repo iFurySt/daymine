@@ -3,3 +3,7 @@
 这个目录用于存放自动生成的仓库知识，比如 schema 快照、API 索引、依赖清单等。
 
 所有生成产物都应该能追溯到对应命令或脚本，并且最好是可重复生成的。
+
+## 当前文件
+
+- [panel-skills.md](panel-skills.md)：当前内置 panel contract，供 Agent 生成 workspace 数据时参考。

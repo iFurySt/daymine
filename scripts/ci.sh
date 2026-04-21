@@ -12,4 +12,9 @@ while IFS= read -r file; do
   bash -n "$file"
 done < <(find "${repo_root}/scripts" -type f -name '*.sh' | sort)
 
+go test ./...
+
+npm --prefix "${repo_root}/apps/web" ci --no-audit
+npm --prefix "${repo_root}/apps/web" run build
+
 echo "基础 CI 检查通过"
