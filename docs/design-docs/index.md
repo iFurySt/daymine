@@ -11,3 +11,4 @@
 ## 初始文档
 
 - `core-beliefs.md`
+- `panel-plugin-system.md`：Daymine panel DSL、官方 renderer registry、自定义 panel 层级和 AI 管理流程。

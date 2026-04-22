@@ -28,3 +28,30 @@ func TestGetDefaultPanels(t *testing.T) {
 		t.Fatal("expected feed items")
 	}
 }
+
+func TestGetHTMLTemplatePanel(t *testing.T) {
+	store, err := workspace.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Init(); err != nil {
+		t.Fatal(err)
+	}
+
+	service := NewService(store)
+	resp, err := service.Get("external-signal")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.Renderer == nil || resp.Renderer.Type != "html-template" {
+		t.Fatalf("expected html-template renderer, got %+v", resp.Renderer)
+	}
+	if resp.Renderer.Template == "" {
+		t.Fatal("expected loaded template")
+	}
+	data := resp.Data.(map[string]any)
+	items := data["items"].([]any)
+	if len(items) == 0 {
+		t.Fatal("expected bound items")
+	}
+}

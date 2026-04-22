@@ -96,6 +96,9 @@
 - [x] 实现 Agent Provider 接口和首个 provider。
 - [x] 补齐 Go 单测、前端构建和仓库 CI 串联。
 - [x] 把 release package 从模板元数据包替换成真实二进制打包。
+- [x] 设计 panel plugin/DSL：Page DSL、Data Source DSL、HTML Template DSL、Renderer DSL、官方 renderer registry 和自定义 panel 层级。
+- [x] 跑通首个外置 `html-template` panel：workspace template/style/data source，前端运行时绑定渲染。
+- [ ] 把当前硬编码 panel renderer 迁移到 renderer registry 和 manifest validation。
 - [ ] 补浏览器 smoke、真实信息源导入和更完整的 provider 配置。
 
 ## 决策记录
@@ -107,3 +110,6 @@
 - 2026-04-21：MVP 采用标准库 HTTP server 和手写 CSS，先减少依赖面；前端生产构建写入 Go embed 目录，由 `make build` 和 `make run` 统一生成。
 - 2026-04-21：`local-command` provider 先作为本地可信执行入口保留，但安全文档明确它不适合公网暴露和非可信输入。
 - 2026-04-21：默认 workspace 改为用户 home 下的 `.daymine`，Windows/macOS/Linux 都通过 Go 的 `os.UserHomeDir()` 解析；仍保留 `--workspace` 和 `make run WORKSPACE=...` 覆盖。
+- 2026-04-22：Panel 目标架构采用受控 DSL，而不是默认执行第三方 JS。官方 renderer 内置在二进制中，社区自定义优先通过 preset、schema renderer 和 workspace manifest 实现。
+- 2026-04-22：动态自定义 panel 采用类似 Go `html/template` 的 HTML fragment template：后端 resolve data context，前端做受控绑定和 `dm-*` 官方标签映射；允许 GENUI 风格块级 HTML，但禁止任意脚本。
+- 2026-04-22：默认 workspace 增加 `external-signal` 外置 panel，用 `config/panels/external-signal.template.html` 和 `index/panels.json` 验证内置 panel 与外置 HTML template panel 可共存。

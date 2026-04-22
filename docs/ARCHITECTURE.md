@@ -53,5 +53,7 @@ Go HTTP server
 
 - 无鉴权：本地版默认不提供登录、注册、OAuth、邮箱验证和多用户权限。
 - Agent 可替换：核心只管理输入、执行状态、日志和产物，不把业务逻辑绑死到 Codex 或某个 LLM API。
-- Panel 可组合：前端使用内置 React 组件和 manifest contract，不让任意 HTML/JS 直接获得无边界执行权。
+- Panel 可组合：前端使用内置 React renderer registry、manifest contract 和受控 DSL，不让任意 HTML/JS 直接获得无边界执行权。
 - 文档同步：架构、panel contract、provider contract 或 workspace layout 变化时，同步更新 `docs/` 和对应 history。
+
+Panel 插件系统的目标设计见 `docs/design-docs/panel-plugin-system.md`。当前 MVP 仍有部分 renderer 和 data source 硬编码，后续要收敛到 Page DSL、Data Source DSL、Renderer DSL 和内置 renderer registry。

@@ -27,12 +27,33 @@ type Page struct {
 }
 
 type Panel struct {
-	ID      string         `json:"id"`
-	Type    string         `json:"type"`
-	Title   string         `json:"title"`
-	Refresh string         `json:"refresh,omitempty"`
-	Source  string         `json:"source,omitempty"`
-	Config  map[string]any `json:"config,omitempty"`
+	ID       string         `json:"id"`
+	Type     string         `json:"type"`
+	Title    string         `json:"title"`
+	Refresh  string         `json:"refresh,omitempty"`
+	Source   string         `json:"source,omitempty"`
+	Renderer *Renderer      `json:"renderer,omitempty"`
+	Data     *DataSource    `json:"data,omitempty"`
+	Config   map[string]any `json:"config,omitempty"`
+}
+
+type Renderer struct {
+	Type         string            `json:"type"`
+	Variant      string            `json:"variant,omitempty"`
+	Template     string            `json:"template,omitempty"`
+	TemplatePath string            `json:"template_path,omitempty"`
+	Style        string            `json:"style,omitempty"`
+	StylePath    string            `json:"style_path,omitempty"`
+	Fields       map[string]string `json:"fields,omitempty"`
+	Config       map[string]any    `json:"config,omitempty"`
+}
+
+type DataSource struct {
+	Type     string `json:"type"`
+	Path     string `json:"path,omitempty"`
+	Selector string `json:"selector,omitempty"`
+	As       string `json:"as,omitempty"`
+	Limit    int    `json:"limit,omitempty"`
 }
 
 type RunRecord struct {
@@ -83,6 +104,22 @@ func (s *Store) Init() error {
 	writes := map[string][]byte{
 		"config/daymine.json": mustJSON(DefaultDashboardConfig()),
 		"index/panels.json":   mustJSON(DefaultPanelData()),
+		"config/panels/external-signal.template.html": []byte(`<dm-list>
+  <dm-item data-for="item in items">
+    <dm-link href="{{ item.url }}">{{ item.title }}</dm-link>
+    <dm-text tone="muted" max-lines="3">{{ item.summary }}</dm-text>
+    <dm-meta>{{ item.source }} · {{ item.published_at }}</dm-meta>
+  </dm-item>
+</dm-list>
+`),
+		"config/panels/external-signal.panel.css": []byte(`dm-item {
+  border-color: hsl(43 50% 24%);
+}
+
+dm-link {
+  color: hsl(43 50% 72%);
+}
+`),
 		"notes/daily/welcome.md": []byte(`# Welcome to Daymine
 
 Daymine keeps local, long-lived notes and Agent artifacts in this workspace.
@@ -97,6 +134,12 @@ Daymine keeps local, long-lived notes and Agent artifacts in this workspace.
 			return err
 		}
 	}
+	if err := s.ensureDefaultHTMLTemplatePanel(); err != nil {
+		return err
+	}
+	if err := s.ensureDefaultPanelData(); err != nil {
+		return err
+	}
 	runs := s.Path("index/runs.jsonl")
 	if _, err := os.Stat(runs); errors.Is(err, os.ErrNotExist) {
 		if err := os.WriteFile(runs, []byte{}, 0o644); err != nil {
@@ -104,6 +147,48 @@ Daymine keeps local, long-lived notes and Agent artifacts in this workspace.
 		}
 	}
 	return nil
+}
+
+func (s *Store) ensureDefaultPanelData() error {
+	index, err := s.PanelIndex()
+	if err != nil {
+		return err
+	}
+	changed := false
+	for key, value := range DefaultPanelData() {
+		if _, ok := index[key]; !ok {
+			index[key] = value
+			changed = true
+		}
+	}
+	if !changed {
+		return nil
+	}
+	return os.WriteFile(s.Path("index/panels.json"), mustJSON(index), 0o644)
+}
+
+func (s *Store) ensureDefaultHTMLTemplatePanel() error {
+	cfg, err := s.DashboardConfig()
+	if err != nil {
+		return err
+	}
+	if len(cfg.Pages) == 0 {
+		return nil
+	}
+	page := &cfg.Pages[0]
+	for _, panel := range page.Panels {
+		if panel.ID == "external-signal" {
+			return nil
+		}
+	}
+	page.Panels = append(page.Panels, defaultExternalSignalPanel())
+	if len(page.LayoutByColumn) == 0 {
+		page.LayoutByColumn = [][]string{{"external-signal"}}
+	} else {
+		last := len(page.LayoutByColumn) - 1
+		page.LayoutByColumn[last] = append([]string{"external-signal"}, page.LayoutByColumn[last]...)
+	}
+	return os.WriteFile(s.Path("config/daymine.json"), mustJSON(cfg), 0o644)
 }
 
 func (s *Store) Path(rel string) string {
@@ -228,12 +313,13 @@ func DefaultDashboardConfig() DashboardConfig {
 		Name:           "home",
 		Title:          "Home",
 		ColumnWidths:   []int{1, 1, 1},
-		LayoutByColumn: [][]string{{"calendar", "feed"}, {"article-list", "github-list"}, {"agent-runs", "markdown-view"}},
+		LayoutByColumn: [][]string{{"calendar", "feed"}, {"article-list", "github-list"}, {"external-signal", "agent-runs", "markdown-view"}},
 		Panels: []Panel{
 			{ID: "calendar", Type: "calendar", Title: "Calendar", Refresh: "1h"},
 			{ID: "feed", Type: "feed", Title: "RSS Feed", Refresh: "15m", Source: "index/panels.json"},
 			{ID: "article-list", Type: "article-list", Title: "Articles", Source: "index/panels.json"},
 			{ID: "github-list", Type: "github-list", Title: "GitHub", Source: "index/panels.json"},
+			defaultExternalSignalPanel(),
 			{ID: "agent-runs", Type: "agent-runs", Title: "Agent Runs", Refresh: "10s", Source: "index/runs.jsonl"},
 			{ID: "markdown-view", Type: "markdown-view", Title: "Welcome", Source: "notes/daily/welcome.md"},
 		},
@@ -251,6 +337,31 @@ func DefaultPanelData() map[string]any {
 		},
 		"github-list": []map[string]any{
 			{"name": "daymine", "full_name": "ifuryst/daymine", "description": "Self-hosted Agent-maintained information dashboard.", "stars": 0, "language": "Go"},
+		},
+		"external-signal": []map[string]any{
+			{"title": "HTML fragment panel is live", "source": "workspace template", "url": "", "summary": "This panel is rendered from config/panels/external-signal.template.html and data-bound from index/panels.json.", "published_at": time.Now().Format(time.RFC3339)},
+			{"title": "AI can edit this UI at runtime", "source": "Daymine DSL", "url": "", "summary": "Change the template, style, or data in the workspace and refresh the panel without rebuilding the binary.", "published_at": time.Now().Format(time.RFC3339)},
+		},
+	}
+}
+
+func defaultExternalSignalPanel() Panel {
+	return Panel{
+		ID:      "external-signal",
+		Type:    "html-template",
+		Title:   "External Panel",
+		Refresh: "15m",
+		Renderer: &Renderer{
+			Type:         "html-template",
+			TemplatePath: "config/panels/external-signal.template.html",
+			StylePath:    "config/panels/external-signal.panel.css",
+		},
+		Data: &DataSource{
+			Type:     "json",
+			Path:     "index/panels.json",
+			Selector: "$.external-signal",
+			As:       "items",
+			Limit:    5,
 		},
 	}
 }

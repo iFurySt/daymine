@@ -1,6 +1,7 @@
 package workspace
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -28,6 +29,50 @@ func TestInitCreatesDefaultWorkspace(t *testing.T) {
 	}
 	if len(cfg.Pages) != 1 || cfg.Pages[0].Panels[0].ID != "calendar" {
 		t.Fatalf("unexpected dashboard config: %+v", cfg)
+	}
+}
+
+func TestInitAddsDefaultHTMLTemplatePanelToExistingConfig(t *testing.T) {
+	store, err := Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(store.Path("config"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	legacy := DashboardConfig{Pages: []Page{{
+		Name:           "home",
+		Title:          "Home",
+		ColumnWidths:   []int{1},
+		LayoutByColumn: [][]string{{"calendar"}},
+		Panels:         []Panel{{ID: "calendar", Type: "calendar", Title: "Calendar"}},
+	}}}
+	data, err := json.Marshal(legacy)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(store.Path("config/daymine.json"), data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := store.Init(); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := store.DashboardConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, panel := range cfg.Pages[0].Panels {
+		if panel.ID == "external-signal" && panel.Renderer != nil && panel.Renderer.Type == "html-template" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("expected migrated external-signal panel: %+v", cfg.Pages[0].Panels)
+	}
+	if cfg.Pages[0].LayoutByColumn[0][0] != "external-signal" {
+		t.Fatalf("expected external panel inserted into layout: %+v", cfg.Pages[0].LayoutByColumn)
 	}
 }
 

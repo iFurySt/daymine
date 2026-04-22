@@ -25,24 +25,28 @@ tididi 中可参考的前端路径：
 
 ## Panel 组件边界
 
-Panel 分为三层：
+Panel 目标上分为四层：
 
-- Manifest：JSON/YAML 描述 `id`、`type`、数据源、刷新策略、字段映射和动作。
-- Data API：后端把 workspace 数据规范化成 panel data payload。
-- React Renderer：前端内置 renderer 负责交互和视觉。
+- Page DSL：JSON/YAML 描述页面、列宽和 panel 布局。
+- Data Source DSL：描述 panel 数据从 workspace 哪个文件、索引、目录或内置源解析。
+- Renderer DSL：描述使用哪个官方 renderer、字段映射、preset 和动作。
+- React Renderer Registry：前端内置 renderer 负责交互和视觉。
 
-首批 renderer：
+首批官方 renderer：
 
+- `list`
+- `card-grid`
+- `timeline`
 - `calendar`
-- `feed`
-- `article-list`
-- `video-card`
-- `github-list`
-- `social-post`
-- `agent-runs`
-- `markdown-view`
+- `markdown`
+- `metric`
+- `table`
+- `schema`
+- `html-template`
 
-第三方扩展先从 manifest、Markdown 模板和 JSON 数据开始。只有当内置 renderer 无法表达真实需求时，再设计受控插件 API。
+`feed`、`article-list`、`github-list`、`video-card`、`social-post` 应作为官方 preset 或字段映射存在，而不是长期作为硬编码 renderer。
+
+第三方扩展先从 manifest、Markdown 模板、JSON 数据、`html-template` renderer 和 `schema` renderer 开始。`html-template` 渲染的是类似 GENUI 的块级 HTML fragment，不是完整页面；它通过 `{{ }}`、`data-for`、`data-if` 和 `dm-*` 官方标签绑定后端 resolved data。只有当内置 renderer 无法表达真实需求时，再设计受控插件 API。完整设计见 `docs/design-docs/panel-plugin-system.md`。
 
 ## 验收方式
 

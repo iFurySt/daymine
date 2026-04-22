@@ -16,7 +16,28 @@ export interface PanelConfig {
   title: string
   refresh?: string
   source?: string
+  renderer?: PanelRenderer
+  data?: PanelDataSource
   config?: Record<string, unknown>
+}
+
+export interface PanelRenderer {
+  type: string
+  variant?: string
+  template?: string
+  template_path?: string
+  style?: string
+  style_path?: string
+  fields?: Record<string, string>
+  config?: Record<string, unknown>
+}
+
+export interface PanelDataSource {
+  type: string
+  path?: string
+  selector?: string
+  as?: string
+  limit?: number
 }
 
 export type PanelType =
@@ -28,6 +49,7 @@ export type PanelType =
   | 'social-post'
   | 'agent-runs'
   | 'markdown-view'
+  | 'html-template'
   | string
 
 export interface PanelResponse {
@@ -35,6 +57,7 @@ export interface PanelResponse {
   type: PanelType
   title: string
   updated_at: string
+  renderer?: PanelRenderer
   data: Record<string, unknown>
 }
 

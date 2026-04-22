@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react'
+import { createElement, FormEvent, useEffect, useMemo, useState } from 'react'
 import {
   Activity,
   CalendarDays,
@@ -13,7 +13,7 @@ import {
   Rss,
 } from 'lucide-react'
 import { getDashboardConfig, getPanel, startRun } from './api'
-import type { DashboardConfig, Page, PanelConfig, PanelResponse, RunRecord } from './types'
+import type { DashboardConfig, Page, PanelConfig, PanelRenderer as PanelRendererConfig, PanelResponse, RunRecord } from './types'
 
 type PanelState = {
   data?: PanelResponse
@@ -30,6 +30,7 @@ const iconByType = {
   'markdown-view': FileText,
   'video-card': Play,
   'social-post': Code2,
+  'html-template': Code2,
 }
 
 export function App() {
@@ -175,6 +176,10 @@ function PanelCard({ panel, state, onRefresh }: { panel: PanelConfig; state?: Pa
 }
 
 function PanelRenderer({ panel, response }: { panel: PanelConfig; response: PanelResponse }) {
+  if (response.renderer?.type === 'html-template' || panel.renderer?.type === 'html-template') {
+    return <HtmlTemplatePanel panelId={panel.id} renderer={response.renderer ?? panel.renderer} data={response.data} />
+  }
+
   switch (panel.type) {
     case 'calendar':
       return <CalendarPanel data={response.data} />
@@ -189,6 +194,26 @@ function PanelRenderer({ panel, response }: { panel: PanelConfig; response: Pane
     default:
       return <ListPanel data={response.data} titleKey="title" detailKey="summary" metaKey="source" />
   }
+}
+
+function HtmlTemplatePanel({
+  panelId,
+  renderer,
+  data,
+}: {
+  panelId: string
+  renderer?: PanelRendererConfig
+  data: Record<string, unknown>
+}) {
+  if (!renderer?.template) {
+    return <EmptyState text="Template is empty" />
+  }
+  return (
+    <div className="html-template-panel" data-panel-id={panelId}>
+      {renderer.style ? <style>{scopePanelCSS(renderer.style, panelId)}</style> : null}
+      {renderTemplate(renderer.template, data)}
+    </div>
+  )
 }
 
 function CalendarPanel({ data }: { data: Record<string, unknown> }) {
@@ -276,3 +301,160 @@ function FullState({ icon, title, detail }: { icon: React.ReactNode; title: stri
 function asArray(value: unknown): Record<string, unknown>[] {
   return Array.isArray(value) ? (value as Record<string, unknown>[]) : []
 }
+
+function renderTemplate(template: string, context: Record<string, unknown>): React.ReactNode {
+  const document = new DOMParser().parseFromString(`<template>${template}</template>`, 'text/html')
+  const root = document.querySelector('template')
+  if (!root) return null
+
+  return Array.from(root.content.childNodes).map((node, index) => renderNode(node, context, index))
+}
+
+function renderNode(node: Node, context: Record<string, unknown>, key: React.Key): React.ReactNode {
+  if (node.nodeType === Node.TEXT_NODE) {
+    return interpolate(node.textContent ?? '', context)
+  }
+
+  if (node.nodeType !== Node.ELEMENT_NODE) {
+    return null
+  }
+
+  const element = node as Element
+  const tag = element.tagName.toLowerCase()
+  if (blockedTags.has(tag)) {
+    return null
+  }
+
+  const condition = element.getAttribute('data-if')
+  if (condition && !resolvePath(context, condition)) {
+    return null
+  }
+
+  const loop = element.getAttribute('data-for')
+  if (loop) {
+    const match = loop.match(/^\s*([A-Za-z_$][\w$]*)\s+in\s+([\w.$]+)\s*$/)
+    if (!match) return null
+    const [, itemName, listPath] = match
+    const list = resolvePath(context, listPath)
+    if (!Array.isArray(list)) return null
+    return list.map((item, index) => {
+      const loopContext = { ...context, [itemName]: item, index }
+      const clone = element.cloneNode(true) as Element
+      clone.removeAttribute('data-for')
+      return renderNode(clone, loopContext, `${String(key)}-${index}`)
+    })
+  }
+
+  const children = Array.from(element.childNodes).map((child, index) => renderNode(child, context, index))
+  const props = safeProps(element, context)
+
+  switch (tag) {
+    case 'dm-list':
+      return <div key={key} className="stack">{children}</div>
+    case 'dm-item':
+    case 'dm-card':
+      return <div key={key} className="item template-item">{children}</div>
+    case 'dm-title':
+      return <div key={key} className="item-title">{children}</div>
+    case 'dm-text':
+      return <div key={key} className={element.getAttribute('tone') === 'muted' ? 'item-detail muted' : 'item-detail'}>{children}</div>
+    case 'dm-meta':
+      return <div key={key} className="muted">{children}</div>
+    case 'dm-badge':
+      return <span key={key} className="pill">{children}</span>
+    case 'dm-link':
+      return <a key={key} className="item-title template-link" {...props}>{children}</a>
+    case 'dm-markdown':
+      return <pre key={key} className="markdown">{children}</pre>
+    default:
+      if (!allowedTags.has(tag)) return <span key={key}>{children}</span>
+      return createElement(tag, { key, ...props }, children)
+  }
+}
+
+function safeProps(element: Element, context: Record<string, unknown>): Record<string, unknown> {
+  const props: Record<string, unknown> = {}
+  for (const attr of Array.from(element.attributes)) {
+    const name = attr.name.toLowerCase()
+    if (name.startsWith('on') || name === 'style' || name === 'data-for' || name === 'data-if') continue
+    if (name === 'class') {
+      props.className = interpolate(attr.value, context)
+      continue
+    }
+    if (name === 'href') {
+      const href = interpolate(attr.value, context)
+      if (isSafeURL(href)) {
+        props.href = href
+        props.target = '_blank'
+        props.rel = 'noreferrer'
+      }
+      continue
+    }
+    if (name === 'src') {
+      const src = interpolate(attr.value, context)
+      if (isSafeURL(src)) props.src = src
+      continue
+    }
+    if (name.startsWith('aria-') || name === 'title' || name === 'alt') {
+      props[name] = interpolate(attr.value, context)
+    }
+  }
+  return props
+}
+
+function interpolate(value: string, context: Record<string, unknown>): string {
+  return value.replace(/\{\{\s*([\w.$]+)\s*\}\}/g, (_, path: string) => {
+    const resolved = resolvePath(context, path)
+    if (resolved == null) return ''
+    if (typeof resolved === 'object') return JSON.stringify(resolved)
+    return String(resolved)
+  })
+}
+
+function resolvePath(context: Record<string, unknown>, path: string): unknown {
+  const clean = path.replace(/^\$\./, '')
+  return clean.split('.').reduce<unknown>((value, part) => {
+    if (value == null || typeof value !== 'object') return undefined
+    return (value as Record<string, unknown>)[part]
+  }, context)
+}
+
+function isSafeURL(value: string): boolean {
+  if (!value) return false
+  try {
+    const parsed = new URL(value, window.location.origin)
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:' || parsed.protocol === 'mailto:'
+  } catch {
+    return false
+  }
+}
+
+function scopePanelCSS(css: string, panelId: string): string {
+  const scope = `.html-template-panel[data-panel-id="${CSS.escape(panelId)}"]`
+  return css
+    .split('}')
+    .map((rule) => {
+      const [selector, body] = rule.split('{')
+      if (!selector || !body || selector.includes('@') || selector.includes('html') || selector.includes('body')) return ''
+      const scopedSelector = selector
+        .split(',')
+        .map((part) => `${scope} ${translateTemplateSelector(part.trim())}`)
+        .join(', ')
+      return `${scopedSelector}{${body}}`
+    })
+    .join('\n')
+}
+
+function translateTemplateSelector(selector: string): string {
+  return selector
+    .replace(/\bdm-item\b/g, '.template-item')
+    .replace(/\bdm-card\b/g, '.template-item')
+    .replace(/\bdm-link\b/g, '.template-link')
+    .replace(/\bdm-text\b/g, '.item-detail')
+    .replace(/\bdm-meta\b/g, '.muted')
+    .replace(/\bdm-title\b/g, '.item-title')
+    .replace(/\bdm-badge\b/g, '.pill')
+}
+
+const blockedTags = new Set(['script', 'iframe', 'object', 'embed', 'link', 'meta', 'style'])
+const allowedTags = new Set(['div', 'section', 'header', 'footer', 'ul', 'ol', 'li', 'p', 'span', 'a', 'img', 'strong', 'em', 'small', 'code', 'pre'])

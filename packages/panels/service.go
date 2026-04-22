@@ -1,8 +1,10 @@
 package panels
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/ifuryst/daymine/packages/workspace"
@@ -13,11 +15,12 @@ type Service struct {
 }
 
 type Response struct {
-	ID        string `json:"id"`
-	Type      string `json:"type"`
-	Title     string `json:"title"`
-	UpdatedAt string `json:"updated_at"`
-	Data      any    `json:"data"`
+	ID        string              `json:"id"`
+	Type      string              `json:"type"`
+	Title     string              `json:"title"`
+	UpdatedAt string              `json:"updated_at"`
+	Renderer  *workspace.Renderer `json:"renderer,omitempty"`
+	Data      any                 `json:"data"`
 }
 
 func NewService(store *workspace.Store) *Service {
@@ -42,6 +45,10 @@ func (s *Service) Get(id string) (Response, error) {
 		return Response{}, err
 	}
 
+	renderer, err := s.renderer(panel)
+	if err != nil {
+		return Response{}, err
+	}
 	data, err := s.data(panel)
 	if err != nil {
 		return Response{}, err
@@ -51,6 +58,7 @@ func (s *Service) Get(id string) (Response, error) {
 		Type:      panel.Type,
 		Title:     panel.Title,
 		UpdatedAt: time.Now().Format(time.RFC3339),
+		Renderer:  renderer,
 		Data:      data,
 	}, nil
 }
@@ -69,6 +77,9 @@ func (s *Service) find(id string) (workspace.Panel, error) {
 }
 
 func (s *Service) data(panel workspace.Panel) (any, error) {
+	if panel.Renderer != nil && panel.Renderer.Type == "html-template" {
+		return s.dataSourceContext(panel)
+	}
 	switch panel.Type {
 	case "calendar":
 		return map[string]any{
@@ -103,4 +114,97 @@ func (s *Service) data(panel workspace.Panel) (any, error) {
 		}
 		return map[string]any{"items": value}, nil
 	}
+}
+
+func (s *Service) renderer(panel workspace.Panel) (*workspace.Renderer, error) {
+	if panel.Renderer == nil {
+		return nil, nil
+	}
+	renderer := *panel.Renderer
+	if renderer.TemplatePath != "" {
+		data, err := os.ReadFile(s.Store.Path(renderer.TemplatePath))
+		if err != nil {
+			return nil, err
+		}
+		renderer.Template = string(data)
+	}
+	if renderer.StylePath != "" {
+		data, err := os.ReadFile(s.Store.Path(renderer.StylePath))
+		if err != nil {
+			return nil, err
+		}
+		renderer.Style = string(data)
+	}
+	return &renderer, nil
+}
+
+func (s *Service) dataSourceContext(panel workspace.Panel) (map[string]any, error) {
+	context := map[string]any{
+		"panel": map[string]any{
+			"id":    panel.ID,
+			"title": panel.Title,
+			"type":  panel.Type,
+		},
+	}
+	if panel.Data == nil {
+		context["items"] = []any{}
+		return context, nil
+	}
+
+	switch panel.Data.Type {
+	case "json":
+		var value any
+		data, err := os.ReadFile(s.Store.Path(panel.Data.Path))
+		if err != nil {
+			return nil, err
+		}
+		if err := json.Unmarshal(data, &value); err != nil {
+			return nil, err
+		}
+		selected := selectValue(value, panel.Data.Selector)
+		selected = applyLimit(selected, panel.Data.Limit)
+		as := panel.Data.As
+		if as == "" {
+			as = "items"
+		}
+		context[as] = selected
+		if as != "items" {
+			context["items"] = selected
+		}
+		return context, nil
+	default:
+		return nil, fmt.Errorf("unsupported data source type %q", panel.Data.Type)
+	}
+}
+
+func selectValue(value any, selector string) any {
+	if selector == "" || selector == "$" {
+		return value
+	}
+	if !strings.HasPrefix(selector, "$.") {
+		return value
+	}
+	current := value
+	for _, part := range strings.Split(strings.TrimPrefix(selector, "$."), ".") {
+		object, ok := current.(map[string]any)
+		if !ok {
+			return []any{}
+		}
+		current = object[part]
+	}
+	if current == nil {
+		return []any{}
+	}
+	return current
+}
+
+func applyLimit(value any, limit int) any {
+	if limit <= 0 {
+		return value
+	}
+	items, ok := value.([]any)
+	if !ok || len(items) <= limit {
+		return value
+	}
+	return items[:limit]
 }
