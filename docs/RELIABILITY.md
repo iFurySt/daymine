@@ -8,6 +8,7 @@ Daymine 的早期可靠性目标是本地可启动、可诊断、可重复验证
 - 启动时自动初始化 workspace 目录和默认示例数据。
 - HTTP 请求使用结构化日志记录 method、path 和 duration。
 - Agent run 默认有超时，结果追加到 `index/runs.jsonl`。
+- Task run 复用 Agent run 记录，并通过 `task_id` 关联 task、panel 和 artifact。
 - 前端生产构建产物内嵌到 Go 二进制，刷新路由 fallback 到 `index.html`。
 
 ## 验证路径
@@ -22,4 +23,5 @@ CI/CD 流程结构和 release 自动化的默认方案，统一写在 `docs/CICD
 
 - 增加浏览器 smoke 测试，验证 dashboard 无登录可见。
 - 增加 Agent run 取消、重试和更细的错误分类。
+- 增加 scheduler 运行历史、跳过原因和下一次触发时间的前端可见状态。
 - 增加 panel 数据 schema 校验和损坏索引恢复提示。

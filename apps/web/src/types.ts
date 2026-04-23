@@ -43,6 +43,7 @@ export interface PanelDataSource {
 export type PanelType =
   | 'calendar'
   | 'feed'
+  | 'hacker-news-top'
   | 'article-list'
   | 'video-card'
   | 'github-list'
@@ -63,6 +64,7 @@ export interface PanelResponse {
 
 export interface RunRecord {
   id: string
+  task_id?: string
   provider: string
   query: string
   status: string
@@ -72,4 +74,16 @@ export interface RunRecord {
   output?: string
   error?: string
   artifacts?: string[]
+}
+
+export interface TaskRecord {
+  id: string
+  title: string
+  description: string
+  provider: string
+  schedule?: string
+  artifacts: string[]
+  panel_ids?: string[]
+  last_run?: RunRecord
+  next_run_at?: string
 }

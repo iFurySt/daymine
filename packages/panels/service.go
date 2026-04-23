@@ -2,6 +2,7 @@ package panels
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -94,6 +95,11 @@ func (s *Service) data(panel workspace.Panel) (any, error) {
 			return nil, err
 		}
 		return map[string]any{"runs": runs}, nil
+	case "hacker-news-top":
+		if panel.Source == "" {
+			return map[string]any{"items": []any{}}, nil
+		}
+		return s.hackerNewsData(panel.Source)
 	case "markdown-view":
 		if panel.Source == "" {
 			return map[string]any{"markdown": ""}, nil
@@ -207,4 +213,25 @@ func applyLimit(value any, limit int) any {
 		return value
 	}
 	return items[:limit]
+}
+
+func (s *Service) hackerNewsData(source string) (map[string]any, error) {
+	data, err := os.ReadFile(s.Store.Path(source))
+	if errors.Is(err, os.ErrNotExist) {
+		return map[string]any{
+			"items":   []any{},
+			"message": "No Hacker News digest yet. Run the Hacker News daily task to collect the first snapshot.",
+		}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(data, &payload); err != nil {
+		return nil, fmt.Errorf("decode %s: %w", source, err)
+	}
+	if _, ok := payload["items"]; !ok {
+		payload["items"] = []any{}
+	}
+	return payload, nil
 }

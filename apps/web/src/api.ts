@@ -1,4 +1,4 @@
-import type { DashboardConfig, PanelResponse, RunRecord } from './types'
+import type { DashboardConfig, PanelResponse, RunRecord, TaskRecord } from './types'
 
 const jsonHeaders = { 'Content-Type': 'application/json' }
 
@@ -25,6 +25,19 @@ export async function startRun(query: string, provider = 'local-command'): Promi
     method: 'POST',
     headers: jsonHeaders,
     body: JSON.stringify({ query, provider }),
+  })
+  return payload.run
+}
+
+export async function getTasks(): Promise<TaskRecord[]> {
+  const payload = await request<{ tasks: TaskRecord[] }>('/api/v1/tasks')
+  return payload.tasks
+}
+
+export async function runTask(taskId: string): Promise<RunRecord> {
+  const payload = await request<{ run: RunRecord }>(`/api/v1/tasks/${encodeURIComponent(taskId)}/runs`, {
+    method: 'POST',
+    headers: jsonHeaders,
   })
   return payload.run
 }

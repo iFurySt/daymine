@@ -33,6 +33,25 @@ type Controller struct {
 	Providers map[string]Provider
 }
 
+type runConfig struct {
+	TaskID  string
+	Timeout time.Duration
+}
+
+type RunOption func(*runConfig)
+
+func WithTaskID(taskID string) RunOption {
+	return func(cfg *runConfig) {
+		cfg.TaskID = taskID
+	}
+}
+
+func WithTimeout(timeout time.Duration) RunOption {
+	return func(cfg *runConfig) {
+		cfg.Timeout = timeout
+	}
+}
+
 func NewController(store *workspace.Store, providers ...Provider) *Controller {
 	controller := &Controller{Store: store, Providers: map[string]Provider{}}
 	for _, provider := range providers {
@@ -41,7 +60,7 @@ func NewController(store *workspace.Store, providers ...Provider) *Controller {
 	return controller
 }
 
-func (c *Controller) Run(ctx context.Context, providerName, query string) (workspace.RunRecord, error) {
+func (c *Controller) Run(ctx context.Context, providerName, query string, opts ...RunOption) (workspace.RunRecord, error) {
 	if providerName == "" {
 		providerName = "local-command"
 	}
@@ -52,10 +71,15 @@ func (c *Controller) Run(ctx context.Context, providerName, query string) (works
 	if strings.TrimSpace(query) == "" {
 		return workspace.RunRecord{}, fmt.Errorf("query is required")
 	}
+	cfg := runConfig{Timeout: 2 * time.Minute}
+	for _, opt := range opts {
+		opt(&cfg)
+	}
 
 	started := time.Now()
 	record := workspace.RunRecord{
 		ID:        fmt.Sprintf("run-%s", started.UTC().Format("20060102T150405.000000000")),
+		TaskID:    cfg.TaskID,
 		Provider:  provider.Name(),
 		Query:     query,
 		Status:    "running",
@@ -66,7 +90,7 @@ func (c *Controller) Run(ctx context.Context, providerName, query string) (works
 		return record, err
 	}
 
-	result, runErr := provider.Run(ctx, Request{Query: query, Workspace: c.Store.Root, Timeout: 2 * time.Minute})
+	result, runErr := provider.Run(ctx, Request{Query: query, Workspace: c.Store.Root, Timeout: cfg.Timeout})
 	record.CompletedAt = time.Now()
 	record.ExitCode = result.ExitCode
 	record.Output = trimOutput(result.Output, 4000)
@@ -134,8 +158,16 @@ func (CodexCLIProvider) Run(ctx context.Context, req Request) (Result, error) {
 	runCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	cmd := exec.CommandContext(runCtx, "codex", "exec", req.Query)
+	cmd := exec.CommandContext(runCtx,
+		"codex",
+		"exec",
+		"--full-auto",
+		"--skip-git-repo-check",
+		"--cd", req.Workspace,
+		"-",
+	)
 	cmd.Dir = req.Workspace
+	cmd.Stdin = strings.NewReader(req.Query)
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	cmd.Stderr = &out

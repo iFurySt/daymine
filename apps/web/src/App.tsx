@@ -5,14 +5,17 @@ import {
   CheckCircle2,
   CircleAlert,
   Code2,
+  ExternalLink,
   FileText,
   Github,
+  MessageSquare,
   Newspaper,
   Play,
   RefreshCw,
   Rss,
+  Star,
 } from 'lucide-react'
-import { getDashboardConfig, getPanel, startRun } from './api'
+import { getDashboardConfig, getPanel, runTask, startRun } from './api'
 import type { DashboardConfig, Page, PanelConfig, PanelRenderer as PanelRendererConfig, PanelResponse, RunRecord } from './types'
 
 type PanelState = {
@@ -24,6 +27,7 @@ type PanelState = {
 const iconByType = {
   calendar: CalendarDays,
   feed: Rss,
+  'hacker-news-top': Newspaper,
   'article-list': Newspaper,
   'github-list': Github,
   'agent-runs': Activity,
@@ -40,6 +44,7 @@ export function App() {
   const [query, setQuery] = useState('printf "# Agent note\\n\\nCreated by Daymine.\\n" > notes/daily/agent-note.md')
   const [provider, setProvider] = useState('local-command')
   const [running, setRunning] = useState(false)
+  const [taskRunning, setTaskRunning] = useState<Record<string, boolean>>({})
 
   useEffect(() => {
     getDashboardConfig()
@@ -89,6 +94,20 @@ export function App() {
     }
   }
 
+  async function handleRunTask(taskId: string, panel: PanelConfig) {
+    setTaskRunning((state) => ({ ...state, [taskId]: true }))
+    try {
+      await runTask(taskId)
+      const refreshIds = Array.from(new Set([panel.id, 'agent-runs']))
+      await Promise.all(refreshIds.map((id) => loadPanel(id)))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Task run failed')
+      await loadPanel('agent-runs')
+    } finally {
+      setTaskRunning((state) => ({ ...state, [taskId]: false }))
+    }
+  }
+
   if (error && !config) {
     return <FullState icon={<CircleAlert />} title="Could not load Daymine" detail={error} />
   }
@@ -128,7 +147,16 @@ export function App() {
               {column.map((id) => {
                 const panel = panelsById.get(id)
                 if (!panel) return null
-                return <PanelCard key={id} panel={panel} state={panelState[id]} onRefresh={() => loadPanel(id)} />
+                return (
+                  <PanelCard
+                    key={id}
+                    panel={panel}
+                    state={panelState[id]}
+                    taskRunning={taskRunning}
+                    onRefresh={() => loadPanel(id)}
+                    onRunTask={(taskId) => handleRunTask(taskId, panel)}
+                  />
+                )
               })}
             </div>
           ))}
@@ -153,8 +181,22 @@ function Header({ page }: { page: Page }) {
   )
 }
 
-function PanelCard({ panel, state, onRefresh }: { panel: PanelConfig; state?: PanelState; onRefresh: () => void }) {
+function PanelCard({
+  panel,
+  state,
+  taskRunning,
+  onRefresh,
+  onRunTask,
+}: {
+  panel: PanelConfig
+  state?: PanelState
+  taskRunning: Record<string, boolean>
+  onRefresh: () => void
+  onRunTask: (taskId: string) => void
+}) {
   const Icon = iconByType[panel.type as keyof typeof iconByType] ?? FileText
+  const configuredTaskId = panel.config?.task_id
+  const taskId = typeof configuredTaskId === 'string' ? configuredTaskId : ''
   return (
     <article className="panel">
       <header className="panel-header">
@@ -162,9 +204,17 @@ function PanelCard({ panel, state, onRefresh }: { panel: PanelConfig; state?: Pa
           <Icon size={15} />
           <span>{panel.title}</span>
         </div>
-        <button className="icon-button" onClick={onRefresh} aria-label={`Refresh ${panel.title}`}>
-          <RefreshCw size={14} className={state?.loading ? 'spin' : ''} />
-        </button>
+        <div className="panel-actions">
+          {taskId && (
+            <button className="task-button" onClick={() => onRunTask(taskId)} disabled={taskRunning[taskId]}>
+              {taskRunning[taskId] ? <RefreshCw className="spin" size={13} /> : <Play size={13} />}
+              {taskRunning[taskId] ? 'Running' : 'Run'}
+            </button>
+          )}
+          <button className="icon-button" onClick={onRefresh} aria-label={`Refresh ${panel.title}`}>
+            <RefreshCw size={14} className={state?.loading ? 'spin' : ''} />
+          </button>
+        </div>
       </header>
       <div className="panel-body">
         {state?.error && <EmptyState text={state.error} />}
@@ -185,6 +235,8 @@ function PanelRenderer({ panel, response }: { panel: PanelConfig; response: Pane
       return <CalendarPanel data={response.data} />
     case 'agent-runs':
       return <RunsPanel data={response.data} />
+    case 'hacker-news-top':
+      return <HackerNewsPanel data={response.data} />
     case 'markdown-view':
       return <MarkdownPanel data={response.data} />
     case 'github-list':
@@ -216,6 +268,44 @@ function HtmlTemplatePanel({
   )
 }
 
+function HackerNewsPanel({ data }: { data: Record<string, unknown> }) {
+  const items = asArray(data.items)
+  if (items.length === 0) return <EmptyState text={String(data.message ?? 'No Hacker News digest yet')} />
+  return (
+    <div className="hn-panel">
+      <div className="hn-meta">
+        <span>{String(data.generated_at ?? '')}</span>
+        <span>{String(data.window_hours ?? 24)}h window</span>
+      </div>
+      <div className="stack">
+        {items.map((item, index) => (
+          <div className="hn-item" key={String(item.id ?? index)}>
+            <div className="hn-rank">{String(item.rank ?? index + 1).padStart(2, '0')}</div>
+            <div className="hn-content">
+              <a className="hn-title" href={String(item.url || item.hn_url || '#')} target="_blank" rel="noreferrer">
+                {String(item.title ?? 'Untitled')}
+                <ExternalLink size={12} />
+              </a>
+              <div className="hn-summary">{String(item.summary ?? '')}</div>
+              <div className="hn-stats">
+                <span>
+                  <Star size={12} />
+                  {String(item.score ?? 0)}
+                </span>
+                <span>
+                  <MessageSquare size={12} />
+                  {String(item.comments ?? 0)}
+                </span>
+                {item.by ? <span>{String(item.by)}</span> : null}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function CalendarPanel({ data }: { data: Record<string, unknown> }) {
   const events = asArray(data.events)
   return (
@@ -240,7 +330,7 @@ function RunsPanel({ data }: { data: Record<string, unknown> }) {
         <div className="run" key={run.id}>
           <div className="run-top">
             <span className={`pill ${run.status}`}>{run.status}</span>
-            <span className="muted">{run.provider}</span>
+            <span className="muted">{run.task_id ?? run.provider}</span>
           </div>
           <div className="mono">{run.query}</div>
           {run.artifacts?.length ? <div className="muted">{run.artifacts.join(', ')}</div> : null}

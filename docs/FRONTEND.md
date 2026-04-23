@@ -44,7 +44,9 @@ Panel 目标上分为四层：
 - `schema`
 - `html-template`
 
-`feed`、`article-list`、`github-list`、`video-card`、`social-post` 应作为官方 preset 或字段映射存在，而不是长期作为硬编码 renderer。
+`feed`、`article-list`、`github-list`、`video-card`、`social-post`、`agent-runs`、`markdown-view`、`hacker-news-top` 应作为官方 preset、字段映射或受控动作配置存在，而不是长期作为硬编码 renderer。
+
+`hacker-news-top` 读取 `index/hacker-news/top10-latest.json`，并通过 panel config 的 `task_id` 触发 `hacker-news-daily-top10`。前端只关心 panel payload，不直接知道 Codex、脚本或抓取细节。
 
 第三方扩展先从 manifest、Markdown 模板、JSON 数据、`html-template` renderer 和 `schema` renderer 开始。`html-template` 渲染的是类似 GENUI 的块级 HTML fragment，不是完整页面；它通过 `{{ }}`、`data-for`、`data-if` 和 `dm-*` 官方标签绑定后端 resolved data。只有当内置 renderer 无法表达真实需求时，再设计受控插件 API。完整设计见 `docs/design-docs/panel-plugin-system.md`。
 

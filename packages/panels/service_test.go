@@ -55,3 +55,26 @@ func TestGetHTMLTemplatePanel(t *testing.T) {
 		t.Fatal("expected bound items")
 	}
 }
+
+func TestGetHackerNewsPanelWithoutDigest(t *testing.T) {
+	store, err := workspace.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Init(); err != nil {
+		t.Fatal(err)
+	}
+
+	service := NewService(store)
+	resp, err := service.Get("hacker-news-top")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.Type != "hacker-news-top" {
+		t.Fatalf("expected HN response, got %+v", resp)
+	}
+	data := resp.Data.(map[string]any)
+	if len(data["items"].([]any)) != 0 {
+		t.Fatalf("expected empty HN items before first digest, got %+v", data)
+	}
+}

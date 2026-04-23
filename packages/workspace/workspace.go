@@ -58,6 +58,7 @@ type DataSource struct {
 
 type RunRecord struct {
 	ID          string    `json:"id"`
+	TaskID      string    `json:"task_id,omitempty"`
 	Provider    string    `json:"provider"`
 	Query       string    `json:"query"`
 	Status      string    `json:"status"`
@@ -83,17 +84,21 @@ func Open(root string) (*Store, error) {
 func (s *Store) Init() error {
 	dirs := []string{
 		"config/panels",
+		"config/tasks",
 		"inbox/rss",
 		"inbox/web",
 		"inbox/social",
 		"inbox/manual",
+		"inbox/hacker-news",
 		"notes/daily",
 		"notes/topics",
 		"notes/sources",
+		"notes/sources/hacker-news",
 		"artifacts/runs",
 		"artifacts/scripts",
 		"artifacts/attachments",
 		"index",
+		"index/hacker-news",
 	}
 	for _, dir := range dirs {
 		if err := os.MkdirAll(s.Path(dir), 0o755); err != nil {
@@ -313,10 +318,11 @@ func DefaultDashboardConfig() DashboardConfig {
 		Name:           "home",
 		Title:          "Home",
 		ColumnWidths:   []int{1, 1, 1},
-		LayoutByColumn: [][]string{{"calendar", "feed"}, {"article-list", "github-list"}, {"external-signal", "agent-runs", "markdown-view"}},
+		LayoutByColumn: [][]string{{"calendar", "feed"}, {"hacker-news-top", "article-list", "github-list"}, {"external-signal", "agent-runs", "markdown-view"}},
 		Panels: []Panel{
 			{ID: "calendar", Type: "calendar", Title: "Calendar", Refresh: "1h"},
 			{ID: "feed", Type: "feed", Title: "RSS Feed", Refresh: "15m", Source: "index/panels.json"},
+			{ID: "hacker-news-top", Type: "hacker-news-top", Title: "Hacker News", Refresh: "1d", Source: "index/hacker-news/top10-latest.json", Config: map[string]any{"task_id": "hacker-news-daily-top10"}},
 			{ID: "article-list", Type: "article-list", Title: "Articles", Source: "index/panels.json"},
 			{ID: "github-list", Type: "github-list", Title: "GitHub", Source: "index/panels.json"},
 			defaultExternalSignalPanel(),

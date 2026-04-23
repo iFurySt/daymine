@@ -14,6 +14,7 @@ import (
 	"github.com/ifuryst/daymine/apps/daymine/internal/webassets"
 	"github.com/ifuryst/daymine/packages/agent"
 	"github.com/ifuryst/daymine/packages/panels"
+	"github.com/ifuryst/daymine/packages/tasks"
 	"github.com/ifuryst/daymine/packages/workspace"
 )
 
@@ -21,6 +22,7 @@ type Server struct {
 	store  *workspace.Store
 	panels *panels.Service
 	agents *agent.Controller
+	tasks  *tasks.Service
 	assets fs.FS
 	logger *slog.Logger
 }
@@ -42,10 +44,12 @@ func New(opts Options) (*Server, error) {
 	if logger == nil {
 		logger = slog.Default()
 	}
+	agents := agent.NewController(opts.Store, agent.LocalCommandProvider{}, agent.CodexCLIProvider{})
 	return &Server{
 		store:  opts.Store,
 		panels: panels.NewService(opts.Store),
-		agents: agent.NewController(opts.Store, agent.LocalCommandProvider{}, agent.CodexCLIProvider{}),
+		agents: agents,
+		tasks:  tasks.NewService(opts.Store, agents),
 		assets: assets,
 		logger: logger,
 	}, nil
@@ -60,8 +64,29 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/panels/", s.panelData)
 	mux.HandleFunc("GET /api/v1/agent/runs", s.agentRuns)
 	mux.HandleFunc("POST /api/v1/agent/runs", s.startAgentRun)
+	mux.HandleFunc("GET /api/v1/tasks", s.taskList)
+	mux.HandleFunc("POST /api/v1/tasks/", s.startTaskRun)
 	mux.HandleFunc("/", s.static)
 	return s.logging(mux)
+}
+
+func (s *Server) StartScheduler(ctx context.Context, interval time.Duration) {
+	if interval <= 0 {
+		interval = time.Hour
+	}
+	ticker := time.NewTicker(interval)
+	go func() {
+		defer ticker.Stop()
+		s.tasks.RunDue(ctx, s.logger)
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				s.tasks.RunDue(ctx, s.logger)
+			}
+		}
+	}()
 }
 
 func (s *Server) health(w http.ResponseWriter, r *http.Request) {
@@ -125,6 +150,32 @@ func (s *Server) startAgentRun(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Minute)
 	defer cancel()
 	record, err := s.agents.Run(ctx, req.Provider, req.Query)
+	status := http.StatusCreated
+	if err != nil {
+		status = http.StatusBadGateway
+	}
+	writeJSON(w, status, map[string]any{"run": record})
+}
+
+func (s *Server) taskList(w http.ResponseWriter, r *http.Request) {
+	items, err := s.tasks.List()
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"tasks": items})
+}
+
+func (s *Server) startTaskRun(w http.ResponseWriter, r *http.Request) {
+	id := strings.TrimPrefix(r.URL.Path, "/api/v1/tasks/")
+	id = strings.TrimSuffix(id, "/runs")
+	if id == "" || strings.Contains(id, "/") || !strings.HasSuffix(r.URL.Path, "/runs") {
+		writeError(w, http.StatusNotFound, errors.New("task not found"))
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Minute)
+	defer cancel()
+	record, err := s.tasks.Run(ctx, id)
 	status := http.StatusCreated
 	if err != nil {
 		status = http.StatusBadGateway
