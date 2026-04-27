@@ -2,7 +2,6 @@ import { createElement, FormEvent, useEffect, useMemo, useState } from 'react'
 import {
   Activity,
   CalendarDays,
-  CheckCircle2,
   CircleAlert,
   Code2,
   ExternalLink,
@@ -39,6 +38,7 @@ const iconByType = {
 
 export function App() {
   const [config, setConfig] = useState<DashboardConfig | null>(null)
+  const [activePageName, setActivePageName] = useState<string | null>(null)
   const [panelState, setPanelState] = useState<Record<string, PanelState>>({})
   const [error, setError] = useState<string | null>(null)
   const [query, setQuery] = useState('printf "# Agent note\\n\\nCreated by Daymine.\\n" > notes/daily/agent-note.md')
@@ -52,7 +52,7 @@ export function App() {
       .catch((err: Error) => setError(err.message))
   }, [])
 
-  const page = config?.pages[0]
+  const page = config?.pages.find((candidate) => candidate.name === activePageName) ?? config?.pages[0]
 
   useEffect(() => {
     if (!page) return
@@ -108,6 +108,11 @@ export function App() {
     }
   }
 
+  async function refreshCurrentPage() {
+    if (!page) return
+    await Promise.all(page.panels.map((panel) => loadPanel(panel.id)))
+  }
+
   if (error && !config) {
     return <FullState icon={<CircleAlert />} title="Could not load Daymine" detail={error} />
   }
@@ -118,7 +123,12 @@ export function App() {
 
   return (
     <div className="shell">
-      <Header page={page} />
+      <Header
+        page={page}
+        pages={config?.pages ?? [page]}
+        onPageChange={setActivePageName}
+        onRefresh={refreshCurrentPage}
+      />
       <main className="layout">
         <section className="agent-bar">
           <div>
@@ -166,16 +176,46 @@ export function App() {
   )
 }
 
-function Header({ page }: { page: Page }) {
+function Header({
+  page,
+  pages,
+  onPageChange,
+  onRefresh,
+}: {
+  page: Page
+  pages: Page[]
+  onPageChange: (pageName: string) => void
+  onRefresh: () => void
+}) {
   return (
     <header className="header">
-      <div>
-        <div className="brand">Daymine</div>
-        <div className="subtle">{page.title} / local self-hosted workspace</div>
-      </div>
-      <div className="status">
-        <CheckCircle2 size={15} />
-        No auth
+      <div className="topbar">
+        <div className="brand-section">
+          <button
+            className="brand-button"
+            onClick={() => onPageChange(pages[0]?.name ?? page.name)}
+            aria-label="Open Daymine dashboard"
+          >
+            <span className="brand-mark">D</span>
+            <span className="brand">Daymine</span>
+          </button>
+        </div>
+        <nav className="topnav" aria-label="Dashboard pages">
+          {pages.map((candidate) => (
+            <button
+              key={candidate.name}
+              className={`nav-item ${candidate.name === page.name ? 'active' : ''}`}
+              onClick={() => onPageChange(candidate.name)}
+            >
+              {candidate.title}
+            </button>
+          ))}
+        </nav>
+        <div className="header-actions">
+          <button className="icon-button" onClick={onRefresh} aria-label="Refresh current page">
+            <RefreshCw size={15} />
+          </button>
+        </div>
       </div>
     </header>
   )

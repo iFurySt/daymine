@@ -8,6 +8,7 @@ Daymine 前端采用 React + TypeScript + Vite，生产构建产物由 Go 二进
 - 字体优先使用 `JetBrains Mono` 或等价 monospace。
 - 卡片圆角不超过 8px；信息面板要密集但留足层级。
 - 页面第一屏就是可用 dashboard，不做营销式 landing page。
+- 顶栏保持 Tididi 式紧凑单行：左侧品牌、中间页面导航、右侧只放必要操作，不展示无操作价值的环境说明或认证状态。
 - 内置 panel 使用统一标题、空态、错误态、刷新态和数据更新时间表达。
 
 tididi 中可参考的前端路径：
