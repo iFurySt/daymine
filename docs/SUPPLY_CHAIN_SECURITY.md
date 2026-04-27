@@ -1,19 +1,21 @@
 # 供应链安全
 
-这份文档定义模板默认采用的供应链安全做法。
+这份文档记录模板当前保留和暂缓启用的供应链安全做法。
 
-## 默认控制项
+## 当前控制项
 
-- 在 Pull Request 上做依赖变更审查。
-- 在 PR、定时任务和手动触发时，用 OSV 对仓库中的依赖声明和 lockfile 做漏洞扫描。
 - 为 release 产物生成 SBOM。
 - 为 release 产物生成 build provenance attestation。
 - 所有 GitHub Actions 都固定到不可变的 commit SHA，而不是漂移的版本标签。
 
+## 暂缓启用
+
+- PR dependency review 和 OSV 漏洞扫描当前不作为常驻 workflow 启用。
+- `.github/workflows/supply-chain-security.yml` 已移除，避免早期模板阶段每次推送或 PR 被不稳定的供应链检查阻塞。
+- 后续当依赖清单、仓库规则和误报处理流程稳定后，可以重新引入独立 workflow。
+
 ## 当前对应关系
 
-- `actions/dependency-review-action`：阻止 PR 引入高风险依赖变更。
-- `google/osv-scanner-action`：根据仓库里的依赖文件扫描已知漏洞。
 - `anchore/sbom-action`：生成 SPDX 格式的 SBOM。
 - `actions/attest-build-provenance`：为 release artifact 生成签名 provenance。
 - `scripts/check-action-pinning.sh`：如果 workflow 里出现浮动 tag 而不是 SHA，直接让 CI 失败。

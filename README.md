@@ -45,6 +45,8 @@ make ci         # Repository checks, Go tests, npm ci, frontend build
 make run ADDR=:7345 WORKSPACE=/path/to/daymine-workspace
 ```
 
+启动日志会打印可直接打开的本地地址，例如 `http://localhost:6345`。
+
 启用内置每日任务调度：
 
 ```bash

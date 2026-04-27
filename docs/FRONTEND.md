@@ -62,4 +62,4 @@ Panel 目标上分为四层：
 - `npm --prefix apps/web install`：安装前端依赖。
 - `npm --prefix apps/web run dev`：启动 Vite dev server，API 代理到 `localhost:6345`。
 - `npm --prefix apps/web run build`：执行 TypeScript 检查并把产物写入 `apps/daymine/internal/webassets/dist`。
-- `make run`：构建前端并启动 Go server。
+- `make run`：构建前端并启动 Go server，启动日志会打印可直接打开的本地 URL。
